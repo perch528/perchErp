@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简ERP管理系统</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link rel="stylesheet" href="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- 引入jQuery -->
+    <script src="https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <!-- 引入Chart.js -->
+    <script src="https://cdn.staticfile.net/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- 配置Tailwind自定义颜色 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        neutral: '#64748b'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .modal-transition {
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+            .tab-active {
+                @apply border-primary text-primary;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <header class="bg-white border-b border-gray-200 py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-cubes text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold">极简ERP系统</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500">管理员</span>
+                <i class="fa fa-user-circle text-gray-400"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 页面标题 -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-2">库存管理</h2>
+            <p class="text-gray-500">处理商品的入库和出库操作</p>
+        </div>
+        
+        <!-- 库存统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">总商品数</p>
+                        <h3 id="total-stock" class="text-3xl font-bold mt-1">-</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fa fa-cube text-primary"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">入库</p>
+                        <h3 id="stock-in" class="text-3xl font-bold mt-1">-</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fa fa-arrow-down text-success"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">出库</p>
+                        <h3 id="stock-out" class="text-3xl font-bold mt-1">-</h3>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fa fa-arrow-up text-danger"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 库存状态统计图表 -->
+        <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+            <h3 class="font-bold text-lg mb-6">库存状态分布</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="h-64">
+                    <canvas id="stockStatusChart"></canvas>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-success mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">正常库存</p>
+                            <p id="normal" class="font-medium">-</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-warning mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">低库存</p>
+                            <p id="low" class="font-medium">-</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-danger mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">缺货</p>
+                            <p id="outOf" class="font-medium">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="mb-8 flex flex-wrap gap-4">
+            <button id="open-stock-in" class="px-6 py-2.5 bg-success text-white rounded-lg hover:bg-success/90 flex items-center transition-colors">
+                <i class="fa fa-arrow-down mr-2"></i>入库
+            </button>
+            <button id="open-stock-out" class="px-6 py-2.5 bg-danger text-white rounded-lg hover:bg-danger/90 flex items-center transition-colors">
+                <i class="fa fa-arrow-up mr-2"></i>出库
+            </button>
+            <!-- 创建物品模板按钮 -->
+            <button id="open-item-template" class="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 flex items-center transition-colors">
+                <i class="fa fa-file-text-o mr-2"></i>创建物品模板
+            </button>
+        </div>
+        
+        <!-- 库存和物品模板标签页 -->
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-8">
+            <div class="border-b border-gray-200">
+                <div class="flex flex-wrap">
+                    <button id="tab-stock-list" class="py-4 px-6 border-b-2 tab-active font-medium">
+                        库存列表
+                    </button>
+                    <button id="tab-item-templates" class="py-4 px-6 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">
+                        物品模板
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 库存列表 -->
+            <div id="stock-list-content" class="p-6">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品编号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    当前库存
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    计数单位
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    库存状态
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    备注
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- 库存列表数据将从服务器加载 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 物品模板列表 -->
+            <div id="item-templates-content" class="p-6 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">物品模板列表</h3>
+                    <button id="open-item-template-from-list" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 flex items-center transition-colors text-sm">
+                        <i class="fa fa-plus mr-1"></i>新增模板
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    模板编号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    物品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    计数单位
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    最低库存预警
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    备注
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    操作
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="template-list" class="bg-white divide-y divide-gray-200">
+                            <!-- 物品模板数据将从服务器加载 -->
+                             <tr class="text-center">
+                                <td>001</td>
+                                <td>机床</td>
+                                <td>台</td>
+                                <td>4</td>
+                                <td>通用机床</td>
+                                <td>
+                                    <button class="px-3 py-1 bg-danger text-white rounded hover:bg-danger/90 ml-2">
+                                        删除
+                                    </button>
+                                </td>
+                             </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-sm text-gray-500">显示 0 条记录（共 0 条）</p>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>上一页</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 出入库历史记录 -->
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div class="border-b border-gray-200">
+                <div class="flex flex-wrap">
+                    <button id="tab-inbound" class="py-4 px-6 border-b-2 tab-active font-medium">
+                        入库历史
+                    </button>
+                    <button id="tab-outbound" class="py-4 px-6 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">
+                        出库历史
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 入库历史记录 -->
+            <div id="inbound-history" class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">入库历史记录</h3>
+                    <div class="relative">
+                        <input type="text" placeholder="搜索记录..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table id="stock-in-record" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    序号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    供应商
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    经手人
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    日期
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- 入库历史数据将从服务器加载 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-sm text-gray-500">显示 0 条记录（共 0 条）</p>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>上一页</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 出库历史记录 -->
+            <div id="outbound-history" class="p-6 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">出库历史记录</h3>
+                    <div class="relative">
+                        <input type="text" placeholder="搜索记录..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table id="stock-out-record" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    序号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    用途
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    经手人
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    日期
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- 出库历史数据将从服务器加载 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-sm text-gray-500">显示 0 条记录（共 0 条）</p>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>上一页</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-6 mt-12">
+        <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+            &copy; 2025 极简ERP管理系统 - 版权所有
+        </div>
+    </footer>
+
+    <!-- 入库模态对话框 -->
+    <div id="stock-in-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <!-- 背景遮罩 -->
+            <div class="fixed inset-0 bg-gray-500 opacity-50 modal-transition"></div>
+
+            <!-- 模态框内容 -->
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 modal-transition transform scale-95 opacity-0" id="stock-in-content">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fa fa-arrow-down text-success mr-2"></i>商品入库
+                        </h3>
+                        <button id="close-stock-in" class="text-gray-400 hover:text-gray-500">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="stock-in-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-product">
+                                商品名称 <span class="text-danger">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="in-product" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">请选择商品</option>
+                                    <!-- 商品列表选项将从服务器加载 -->
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                    <i class="fa fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-quantity">
+                                入库数量 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="in-quantity" min="1" value="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-supplier">
+                                供应商
+                            </label>
+                            <input type="text" id="in-supplier" placeholder="输入供应商名称"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-operator">
+                                经手人 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="in-operator" placeholder="输入经手人姓名"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-date">
+                                入库日期 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="in-date" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-remark">
+                                备注信息
+                            </label>
+                            <textarea id="in-remark" rows="2" placeholder="输入备注信息（可选）"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"></textarea>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end space-x-3">
+                    <button id="cancel-stock-in" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button id="submit-stock-in" class="px-4 py-2 bg-success text-white rounded-lg hover:bg-success/90">
+                        确认入库
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 出库模态对话框 -->
+    <div id="stock-out-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <!-- 背景遮罩 -->
+            <div class="fixed inset-0 bg-gray-500 opacity-50 modal-transition"></div>
+
+            <!-- 模态框内容 -->
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 modal-transition transform scale-95 opacity-0" id="stock-out-content">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fa fa-arrow-up text-danger mr-2"></i>商品出库
+                        </h3>
+                        <button id="close-stock-out" class="text-gray-400 hover:text-gray-500">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="stock-out-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-product">
+                                商品名称 <span class="text-danger">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="out-product" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">请选择商品</option>
+                                    <!-- 商品列表选项将从服务器加载 -->
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                    <i class="fa fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-stock">
+                                当前库存
+                            </label>
+                            <div id="out-stock" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                                请选择商品查看库存
+                            </div>
+                        </div> -->
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-quantity">
+                                出库数量 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="out-quantity" min="1" value="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-purpose">
+                                出库用途
+                            </label>
+                            <select id="out-purpose" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                <option value="">请选择用途</option>
+                                <option value="sale">销售</option>
+                                <option value="use">内部使用</option>
+                                <option value="return">退货</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-operator">
+                                经手人 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="out-operator" placeholder="输入经手人姓名"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-date">
+                                出库日期 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="out-date" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end space-x-3">
+                    <button id="cancel-stock-out" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button id="submit-stock-out" class="px-4 py-2 bg-danger text-white rounded-lg hover:bg-danger/90">
+                        确认出库
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 物品模板模态对话框 -->
+    <div id="item-template-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <!-- 背景遮罩 -->
+            <div class="fixed inset-0 bg-gray-500 opacity-50 modal-transition"></div>
+
+            <!-- 模态框内容 -->
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 modal-transition transform scale-95 opacity-0" id="item-template-content">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fa fa-file-text-o text-primary mr-2"></i>创建物品模板
+                        </h3>
+                        <button id="close-item-template" class="text-gray-400 hover:text-gray-500">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="item-template-form" class="space-y-4">
+                        <!-- 调换物品编号和物品名称顺序，将规格型号改为物品编号 -->
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="template-name">
+                                物品名称 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="template-name" placeholder="输入物品名称"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="template-unit">
+                                计数单位 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="template-unit" placeholder="如：个、件、箱等"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <!-- 删除物品类别字段 -->
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="template-min-stock">
+                                最低库存预警 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="template-min-stock" min="0" value="0"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="template-remark">
+                                备注信息 <span class="text-danger">*</span>
+                            </label>
+                            <textarea id="template-remark" rows="2" placeholder="请输入备注信息"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"></textarea>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end space-x-3">
+                    <button id="cancel-item-template" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button id="submit-item-template" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                        保存模板
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="./js/home.js"></script>
+</body>
+</html>

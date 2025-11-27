@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简ERP管理系统</title>
+    <!-- 引入外部资源 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    
+    <!-- 配置Tailwind自定义颜色 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        neutral: '#64748b'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .modal-transition {
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+            .tab-active {
+                @apply border-primary text-primary;
+            }
+            .loading {
+                @apply animate-pulse bg-gray-200 rounded;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <header class="bg-white border-b border-gray-200 py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-cubes text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold">极简ERP系统</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500">管理员</span>
+                <i class="fa fa-user-circle text-gray-400"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 页面标题 -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-2">库存管理</h2>
+            <p class="text-gray-500">处理商品的入库和出库操作</p>
+        </div>
+        
+        <!-- 库存统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">总商品数</p>
+                        <h3 class="text-3xl font-bold mt-1" id="total-products">-</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fa fa-cube text-primary"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">本月入库</p>
+                        <h3 class="text-3xl font-bold mt-1" id="month-inbound">-</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fa fa-arrow-down text-success"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-gray-500 text-sm">本月出库</p>
+                        <h3 class="text-3xl font-bold mt-1" id="month-outbound">-</h3>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fa fa-arrow-up text-danger"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 库存状态统计图表 -->
+        <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+            <h3 class="font-bold text-lg mb-6">库存状态分布</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="h-64">
+                    <canvas id="stockStatusChart"></canvas>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-success mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">正常库存</p>
+                            <p class="font-medium" id="normal-stock">-</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-warning mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">低库存</p>
+                            <p class="font-medium" id="low-stock">-</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-danger mr-3"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">缺货</p>
+                            <p class="font-medium" id="out-of-stock">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="mb-8 flex flex-wrap gap-4">
+            <button id="open-stock-in" class="px-6 py-2.5 bg-success text-white rounded-lg hover:bg-success/90 flex items-center transition-colors">
+                <i class="fa fa-arrow-down mr-2"></i>入库
+            </button>
+            <button id="open-stock-out" class="px-6 py-2.5 bg-danger text-white rounded-lg hover:bg-danger/90 flex items-center transition-colors">
+                <i class="fa fa-arrow-up mr-2"></i>出库
+            </button>
+        </div>
+        
+        <!-- 库存列表 -->
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="font-bold text-lg">库存列表</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                商品编号
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                商品名称
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                类别
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                当前库存
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                单位
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                库存状态
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="stock-list-body">
+                        <!-- 库存列表数据将从服务器加载 -->
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                <i class="fa fa-spinner fa-spin mr-2"></i>加载库存数据中...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 出入库历史记录 -->
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div class="border-b border-gray-200">
+                <div class="flex flex-wrap">
+                    <button id="tab-inbound" class="py-4 px-6 border-b-2 tab-active font-medium">
+                        入库历史
+                    </button>
+                    <button id="tab-outbound" class="py-4 px-6 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">
+                        出库历史
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 入库历史记录 -->
+            <div id="inbound-history" class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">入库历史记录</h3>
+                    <div class="relative">
+                        <input type="text" placeholder="搜索记录..." id="inbound-search" 
+                            class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    序号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    供应商
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    经手人
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    日期
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="inbound-history-body">
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                    <i class="fa fa-spinner fa-spin mr-2"></i>加载入库历史数据中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-sm text-gray-500" id="inbound-pagination-info">显示 0 条记录（共 0 条）</p>
+                    <div class="flex space-x-2">
+                        <button id="inbound-prev" class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>上一页</button>
+                        <button id="inbound-next" class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 出库历史记录 -->
+            <div id="outbound-history" class="p-6 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">出库历史记录</h3>
+                    <div class="relative">
+                        <input type="text" placeholder="搜索记录..." id="outbound-search" 
+                            class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    序号
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    商品名称
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    用途
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    经手人
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    日期
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="outbound-history-body">
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                    <i class="fa fa-spinner fa-spin mr-2"></i>加载出库历史数据中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-sm text-gray-500" id="outbound-pagination-info">显示 0 条记录（共 0 条）</p>
+                    <div class="flex space-x-2">
+                        <button id="outbound-prev" class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>上一页</button>
+                        <button id="outbound-next" class="px-3 py-1 border border-gray-300 rounded text-gray-500 bg-gray-50" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-6 mt-12">
+        <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+            &copy; 2023 极简ERP管理系统 - 版权所有
+        </div>
+    </footer>
+
+    <!-- 入库模态对话框 -->
+    <div id="stock-in-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <!-- 背景遮罩 -->
+            <div class="fixed inset-0 bg-gray-500 opacity-50 modal-transition"></div>
+
+            <!-- 模态框内容 -->
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 modal-transition transform scale-95 opacity-0" id="stock-in-content">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fa fa-arrow-down text-success mr-2"></i>商品入库
+                        </h3>
+                        <button id="close-stock-in" class="text-gray-400 hover:text-gray-500">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="stock-in-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-product">
+                                商品名称 <span class="text-danger">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="in-product" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">加载商品列表中...</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                    <i class="fa fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-quantity">
+                                入库数量 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="in-quantity" min="1" value="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            <p class="text-xs text-gray-500 mt-1">请输入大于0的整数</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-supplier">
+                                供应商
+                            </label>
+                            <input type="text" id="in-supplier" placeholder="输入供应商名称"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-operator">
+                                经手人 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="in-operator" placeholder="输入经手人姓名"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-date">
+                                入库日期 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="in-date" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="in-remark">
+                                备注信息
+                            </label>
+                            <textarea id="in-remark" rows="2" placeholder="输入备注信息（可选）"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"></textarea>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end space-x-3">
+                    <button id="cancel-stock-in" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button id="submit-stock-in" class="px-4 py-2 bg-success text-white rounded-lg hover:bg-success/90">
+                        确认入库
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 出库模态对话框 -->
+    <div id="stock-out-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <!-- 背景遮罩 -->
+            <div class="fixed inset-0 bg-gray-500 opacity-50 modal-transition"></div>
+
+            <!-- 模态框内容 -->
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 modal-transition transform scale-95 opacity-0" id="stock-out-content">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fa fa-arrow-up text-danger mr-2"></i>商品出库
+                        </h3>
+                        <button id="close-stock-out" class="text-gray-400 hover:text-gray-500">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="stock-out-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-product">
+                                商品名称 <span class="text-danger">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="out-product" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">加载商品列表中...</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                    <i class="fa fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-stock">
+                                当前库存
+                            </label>
+                            <div id="out-stock" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                                请选择商品查看库存
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-quantity">
+                                出库数量 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="out-quantity" min="1" value="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            <p class="text-xs text-gray-500 mt-1">请输入大于0的整数，且不超过当前库存</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-purpose">
+                                出库用途
+                            </label>
+                            <select id="out-purpose" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                <option value="">请选择用途</option>
+                                <option value="sale">销售</option>
+                                <option value="use">内部使用</option>
+                                <option value="return">退货</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-operator">
+                                经手人 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="out-operator" placeholder="输入经手人姓名"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="out-date">
+                                出库日期 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="out-date" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end space-x-3">
+                    <button id="cancel-stock-out" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button id="submit-stock-out" class="px-4 py-2 bg-danger text-white rounded-lg hover:bg-danger/90">
+                        确认出库
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示框 -->
+    <div id="notification" class="fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 flex items-center z-50">
+        <i id="notification-icon" class="mr-3 text-xl"></i>
+        <span id="notification-message"></span>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // API基础配置
+        const API_CONFIG = {
+            baseUrl: '/api',
+            timeout: 10000,
+        };
+        
+        // 页面状态管理
+        const pageState = {
+            inboundPage: 1,
+            outboundPage: 1,
+            pageSize: 10,
+        };
+        
+        // 初始化图表
+        let stockChart = null;
+        
+        // 工具函数 - 显示通知
+        function showNotification(message, type = 'success') {
+            const notification = $('#notification');
+            const icon = $('#notification-icon');
+            const msgElement = $('#notification-message');
+            
+            // 设置通知类型样式
+            notification.removeClass('bg-success bg-danger bg-warning');
+            icon.removeClass('fa-check-circle text-success fa-exclamation-circle text-danger fa-info-circle text-warning');
+            
+            switch(type) {
+                case 'success':
+                    notification.addClass('bg-success text-white');
+                    icon.addClass('fa-check-circle text-white');
+                    break;
+                case 'error':
+                    notification.addClass('bg-danger text-white');
+                    icon.addClass('fa-exclamation-circle text-white');
+                    break;
+                case 'warning':
+                    notification.addClass('bg-warning text-white');
+                    icon.addClass('fa-info-circle text-white');
+                    break;
+            }
+            
+            // 设置消息并显示
+            msgElement.text(message);
+            notification.css('transform', 'translateX(0)');
+            
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                notification.css('transform', 'translateX(calc(100% + 20px))');
+            }, 3000);
+        }
+        
+        // 统一API请求函数
+        function apiRequest(url, method = 'GET', data = null) {
+            // 显示加载状态
+            $('body').append('<div class="fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center"><i class="fa fa-spinner fa-spin text-4xl text-primary"></i></div>');
+            
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    url: `${API_CONFIG.baseUrl}${url}`,
+                    method: method,
+                    data: method === 'GET' ? data : JSON.stringify(data),
+                    contentType: 'application/json',
+                    dataType: 'json',
+                    timeout: API_CONFIG.timeout,
+                    success: function(response) {
+                        // 移除加载状态
+                        $('.fixed.inset-0').remove();
+                        
+                        if (response.success) {
+                            resolve(response.data);
+                        } else {
+                            showNotification(response.message || '操作失败', 'error');
+                            reject(new Error(response.message || 'API请求失败'));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        // 移除加载状态
+                        $('.fixed.inset-0').remove();
+                        
+                        let errorMsg = '网络错误，请稍后重试';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        } else if (status === 'timeout') {
+                            errorMsg = '请求超时';
+                        }
+                        
+                        showNotification(errorMsg, 'error');
+                        reject(new Error(errorMsg));
+                    }
+                });
+            });
+        }
+        
+        // 加载商品列表（用于入库出库表单）
+        function loadProducts() {
+            return apiRequest('/products')
+                .then(data => {
+                    const inProductSelect = $('#in-product');
+                    const outProductSelect = $('#out-product');
+                    
+                    // 清空并添加默认选项
+                    inProductSelect.empty().append('<option value="">请选择商品</option>');
+                    outProductSelect.empty().append('<option value="">请选择商品</option>');
+                    
+                    // 添加商品选项
+                    data.forEach(product => {
+                        const option = `<option value="${product.id}">${product.name}</option>`;
+                        inProductSelect.append(option);
+                        outProductSelect.append(option);
+                    });
+                    
+                    return data;
+                })
+                .catch(error => {
+                    console.error('加载商品列表失败:', error);
+                    $('#in-product').html('<option value="">加载商品失败</option>');
+                    $('#out-product').html('<option value="">加载商品失败</option>');
+                });
+        }
+        
+        // 加载库存统计数据
+        function loadStockStatistics() {
+            return apiRequest('/statistics/stock')
+                .then(data => {
+                    $('#total-products').text(data.totalProducts || 0);
+                    $('#month-inbound').text(data.monthInbound || 0);
+                    $('#month-outbound').text(data.monthOutbound || 0);
+                    return data;
+                })
+                .catch(error => {
+                    console.error('加载库存统计失败:', error);
+                });
+        }
+        
+        // 加载库存状态分布数据
+        function loadStockStatus() {
+            return apiRequest('/statistics/stock-status')
+                .then(data => {
+                    // 更新图表
+                    const ctx = document.getElementById('stockStatusChart').getContext('2d');
+                    
+                    // 准备图表数据
+                    const chartData = {
+                        normal: data.normal || 0,
+                        low: data.low || 0,
+                        outOfStock: data.outOfStock || 0
+                    };
+                    
+                    // 更新文本数据
+                    $('#normal-stock').text(chartData.normal);
+                    $('#low-stock').text(chartData.low);
+                    $('#out-of-stock').text(chartData.outOfStock);
+                    
+                    // 初始化或更新图表
+                    if (stockChart) {
+                        stockChart.data.datasets[0].data = [
+                            chartData.normal,
+                            chartData.low,
+                            chartData.outOfStock
+                        ];
+                        stockChart.update();
+                    } else {
+                        stockChart = new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['正常库存', '低库存', '缺货'],
+                                datasets: [{
+                                    data: [
+                                        chartData.normal,
+                                        chartData.low,
+                                        chartData.outOfStock
+                                    ],
+                                    backgroundColor: [
+                                        '#10b981', // success
+                                        '#f59e0b', // warning
+                                        '#ef4444'  // danger
+                                    ],
+                                    borderWidth: 0,
+                                    hoverOffset: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                cutout: '70%',
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                return `${context.label}: ${context.raw} 件`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('加载库存状态失败:', error);
+                    $('#stockStatusChart').parent().html('<div class="text-center py-12 text-gray-500">加载图表失败</div>');
+                });
+        }
+        
+        // 加载库存列表
+        function loadStockList() {
+            return apiRequest('/stock')
+                .then(data => {
+                    const tbody = $('#stock-list-body');
+                    tbody.empty();
+                    
+                    if (data.length === 0) {
+                        tbody.append(`
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                    暂无库存数据
+                                </td>
+                            </tr>
+                        `);
+                        return;
+                    }
+                    
+                    // 生成库存列表
+                    data.forEach(item => {
+                        // 库存状态样式
+                        let statusClass = 'bg-green-100 text-green-800';
+                        let statusText = '正常';
+                        
+                        if (item.stock === 0) {
+                            statusClass = 'bg-red-100 text-red-800';
+                            statusText = '缺货';
+                        } else if (item.stock <= 5) {
+                            statusClass = 'bg-yellow-100 text-yellow-800';
+                            statusText = '低库存';
+                        }
+                        
+                        tbody.append(`
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${item.productCode || ''}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">${item.productName || ''}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${item.category || ''}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${item.stock || 0}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${item.unit || ''}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                        ${statusText}
+                                    </span>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                })
+                .catch(error => {
+                    console.error('加载库存列表失败:', error);
+                    $('#stock-list-body').html(`
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                加载库存数据失败
+                            </td>
+                        </tr>
+                    `);
+                });
+        }
+        
+        // 加载入库历史
+        function loadInboundHistory(page = 1, search = '') {
+            pageState.inboundPage = page;
+            
+            return apiRequest('/history/inbound', 'GET', {
+                page: page,
+                pageSize: pageState.pageSize,
+                search: search
+            })
+            .then(data => {
+                const tbody = $('#inbound-history-body');
+                tbody.empty();
+                
+                // 更新分页信息
+                $('#inbound-pagination-info').text(`显示 ${data.items.length} 条记录（共 ${data.total} 条）`);
+                
+                // 更新分页按钮状态
+                $('#inbound-prev').prop('disabled', page <= 1);
+                $('#inbound-next').prop('disabled', page >= data.totalPages);
+                
+                if (data.items.length === 0) {
+                    tbody.append(`
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                暂无入库记录
+                            </td>
+                        </tr>
+                    `);
+                    return;
+                }
+                
+                // 生成入库历史列表
+                data.items.forEach((item, index) => {
+                    tbody.append(`
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${(page - 1) * pageState.pageSize + index + 1}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">${item.productName || ''}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.quantity || 0}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.supplier || ''}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.operator || ''}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.date ? new Date(item.date).toLocaleString() : ''}
+                            </td>
+                        </tr>
+                    `);
+                });
+            })
+            .catch(error => {
+                console.error('加载入库历史失败:', error);
+                $('#inbound-history-body').html(`
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                            加载入库历史失败
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // 加载出库历史
+        function loadOutboundHistory(page = 1, search = '') {
+            pageState.outboundPage = page;
+            
+            return apiRequest('/history/outbound', 'GET', {
+                page: page,
+                pageSize: pageState.pageSize,
+                search: search
+            })
+            .then(data => {
+                const tbody = $('#outbound-history-body');
+                tbody.empty();
+                
+                // 更新分页信息
+                $('#outbound-pagination-info').text(`显示 ${data.items.length} 条记录（共 ${data.total} 条）`);
+                
+                // 更新分页按钮状态
+                $('#outbound-prev').prop('disabled', page <= 1);
+                $('#outbound-next').prop('disabled', page >= data.totalPages);
+                
+                if (data.items.length === 0) {
+                    tbody.append(`
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                暂无出库记录
+                            </td>
+                        </tr>
+                    `);
+                    return;
+                }
+                
+                // 生成出库历史列表
+                data.items.forEach((item, index) => {
+                    // 转换用途为中文
+                    let purposeText = '';
+                    switch(item.purpose) {
+                        case 'sale': purposeText = '销售'; break;
+                        case 'use': purposeText = '内部使用'; break;
+                        case 'return': purposeText = '退货'; break;
+                        case 'other': purposeText = '其他'; break;
+                        default: purposeText = item.purpose;
+                    }
+                    
+                    tbody.append(`
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${(page - 1) * pageState.pageSize + index + 1}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">${item.productName || ''}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.quantity || 0}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${purposeText}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.operator || ''}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${item.date ? new Date(item.date).toLocaleString() : ''}
+                            </td>
+                        </tr>
+                    `);
+                });
+            })
+            .catch(error => {
+                console.error('加载出库历史失败:', error);
+                $('#outbound-history-body').html(`
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                            加载出库历史失败
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+        
+        // 获取商品库存
+        function getProductStock(productId) {
+            return apiRequest(`/stock/product/${productId}`)
+                .then(data => {
+                    return data.stock || 0;
+                })
+                .catch(error => {
+                    console.error('获取商品库存失败:', error);
+                    return -1;
+                });
+        }
+        
+        // 提交入库操作
+        function submitStockIn(data) {
+            return apiRequest('/stock/in', 'POST', data)
+                .then(result => {
+                    showNotification('入库操作成功完成');
+                    return result;
+                });
+        }
+        
+        // 提交出库操作
+        function submitStockOut(data) {
+            return apiRequest('/stock/out', 'POST', data)
+                .then(result => {
+                    showNotification('出库操作成功完成');
+                    return result;
+                });
+        }
+        
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+        
+        // 页面加载完成后初始化
+        $(document).ready(function() {
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            $('#in-date').val(today);
+            $('#out-date').val(today);
+            
+            // 并行加载初始数据
+            Promise.all([
+                loadStockStatistics(),
+                loadStockStatus(),
+                loadStockList(),
+                loadProducts(),
+                loadInboundHistory()
+            ]).catch(error => {
+                console.error('初始化数据加载失败:', error);
+            });
+            
+            // 入库/出库历史标签切换
+            $('#tab-inbound').click(function() {
+                $('#tab-inbound').addClass('tab-active');
+                $('#tab-outbound').removeClass('tab-active').addClass('border-transparent text-gray-500');
+                $('#inbound-history').removeClass('hidden');
+                $('#outbound-history').addClass('hidden');
+                
+                // 加载出库历史（如果尚未加载）
+                if ($('#outbound-history-body').find('tr').length === 0) {
+                    loadOutboundHistory();
+                }
+            });
+            
+            $('#tab-outbound').click(function() {
+                $('#tab-outbound').addClass('tab-active');
+                $('#tab-inbound').removeClass('tab-active').addClass('border-transparent text-gray-500');
+                $('#outbound-history').removeClass('hidden');
+                $('#inbound-history').addClass('hidden');
+                
+                // 加载出库历史（如果尚未加载）
+                if ($('#outbound-history-body').find('tr').length === 0) {
+                    loadOutboundHistory();
+                }
+            });
+            
+            // 入库历史分页
+            $('#inbound-prev').click(function() {
+                if (pageState.inboundPage > 1) {
+                    loadInboundHistory(pageState.inboundPage - 1, $('#inbound-search').val());
+                }
+            });
+            
+            $('#inbound-next').click(function() {
+                loadInboundHistory(pageState.inboundPage + 1, $('#inbound-search').val());
+            });
+            
+            // 出库历史分页
+            $('#outbound-prev').click(function() {
+                if (pageState.outboundPage > 1) {
+                    loadOutboundHistory(pageState.outboundPage - 1, $('#outbound-search').val());
+                }
+            });
+            
+            $('#outbound-next').click(function() {
+                loadOutboundHistory(pageState.outboundPage + 1, $('#outbound-search').val());
+            });
+            
+            // 入库历史搜索
+            $('#inbound-search').on('input', debounce(function() {
+                loadInboundHistory(1, $(this).val());
+            }, 500));
+            
+            // 出库历史搜索
+            $('#outbound-search').on('input', debounce(function() {
+                loadOutboundHistory(1, $(this).val());
+            }, 500));
+            
+            // 打开入库模态框 - 确保正确绑定事件
+            $('#open-stock-in').off('click').on('click', function() {
+                $('#stock-in-modal').removeClass('hidden');
+                // 强制重绘以确保动画效果
+                setTimeout(() => {
+                    $('#stock-in-content').removeClass('scale-95 opacity-0').addClass('scale-100 opacity-100');
+                }, 10);
+            });
+            
+            // 关闭入库模态框 - 绑定所有关闭途径
+            const closeStockIn = function() {
+                $('#stock-in-content').removeClass('scale-100 opacity-100').addClass('scale-95 opacity-0');
+                setTimeout(() => {
+                    $('#stock-in-modal').addClass('hidden');
+                }, 200);
+            };
+            
+            $('#close-stock-in, #cancel-stock-in').off('click').on('click', closeStockIn);
+            $('#stock-in-modal .bg-gray-500').off('click').on('click', closeStockIn);
+            
+            // 打开出库模态框 - 确保正确绑定事件
+            $('#open-stock-out').off('click').on('click', function() {
+                $('#stock-out-modal').removeClass('hidden');
+                // 强制重绘以确保动画效果
+                setTimeout(() => {
+                    $('#stock-out-content').removeClass('scale-95 opacity-0').addClass('scale-100 opacity-100');
+                }, 10);
+            });
+            
+            // 关闭出库模态框 - 绑定所有关闭途径
+            const closeStockOut = function() {
+                $('#stock-out-content').removeClass('scale-100 opacity-100').addClass('scale-95 opacity-0');
+                setTimeout(() => {
+                    $('#stock-out-modal').addClass('hidden');
+                }, 200);
+            };
+            
+            $('#close-stock-out, #cancel-stock-out').off('click').on('click', closeStockOut);
+            $('#stock-out-modal .bg-gray-500').off('click').on('click', closeStockOut);
+            
+            // 选择出库商品时加载库存
+            $('#out-product').off('change').on('change', function() {
+                const productId = $(this).val();
+                if (productId) {
+                    $('#out-stock').text('加载中...');
+                    getProductStock(productId)
+                        .then(stock => {
+                            if (stock === -1) {
+                                $('#out-stock').text('获取库存失败');
+                                return;
+                            }
+                            
+                            $('#out-stock').text(`当前库存: ${stock} 件`);
+                            
+                            // 库存状态提示
+                            $('#out-stock').removeClass('text-danger text-yellow-500');
+                            if (stock === 0) {
+                                $('#out-stock').addClass('text-danger');
+                            } else if (stock <= 5) {
+                                $('#out-stock').addClass('text-yellow-500');
+                            }
+                        });
+                } else {
+                    $('#out-stock').text('请选择商品查看库存').removeClass('text-danger text-yellow-500');
+                }
+            });
+            
+            // 阻止模态框内部点击事件冒泡
+            $('#stock-in-content, #stock-out-content').off('click').on('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // 入库提交
+            $('#submit-stock-in').off('click').on('click', function() {
+                // 收集表单数据
+                const stockInData = {
+                    productId: $('#in-product').val(),
+                    quantity: parseInt($('#in-quantity').val()),
+                    supplier: $('#in-supplier').val(),
+                    operator: $('#in-operator').val(),
+                    date: $('#in-date').val(),
+                    remark: $('#in-remark').val()
+                };
+                
+                // 表单验证
+                if (!stockInData.productId) {
+                    showNotification('请选择商品', 'warning');
+                    return;
+                }
+                
+                if (!stockInData.quantity || stockInData.quantity < 1 || isNaN(stockInData.quantity)) {
+                    showNotification('请输入有效的入库数量', 'warning');
+                    return;
+                }
+                
+                if (!stockInData.operator) {
+                    showNotification('请输入经手人', 'warning');
+                    return;
+                }
+                
+                if (!stockInData.date) {
+                    showNotification('请选择入库日期', 'warning');
+                    return;
+                }
+                
+                // 提交入库操作
+                submitStockIn(stockInData)
+                    .then(() => {
+                        // 关闭模态框
+                        closeStockIn();
+                        
+                        // 重置表单
+                        $('#stock-in-form')[0].reset();
+                        $('#in-date').val(today);
+                        
+                        // 刷新相关数据
+                        loadStockStatistics();
+                        loadStockStatus();
+                        loadStockList();
+                        loadInboundHistory();
+                    });
+            });
+            
+            // 出库提交
+            $('#submit-stock-out').off('click').on('click', function() {
+                // 收集表单数据
+                const stockOutData = {
+                    productId: $('#out-product').val(),
+                    quantity: parseInt($('#out-quantity').val()),
+                    purpose: $('#out-purpose').val(),
+                    operator: $('#out-operator').val(),
+                    date: $('#out-date').val()
+                };
+                
+                // 表单验证
+                if (!stockOutData.productId) {
+                    showNotification('请选择商品', 'warning');
+                    return;
+                }
+                
+                if (!stockOutData.quantity || stockOutData.quantity < 1 || isNaN(stockOutData.quantity)) {
+                    showNotification('请输入有效的出库数量', 'warning');
+                    return;
+                }
+                
+                if (!stockOutData.operator) {
+                    showNotification('请输入经手人', 'warning');
+                    return;
+                }
+                
+                if (!stockOutData.date) {
+                    showNotification('请选择出库日期', 'warning');
+                    return;
+                }
+                
+                // 检查库存是否充足
+                getProductStock(stockOutData.productId)
+                    .then(stock => {
+                        if (stock === -1) {
+                            showNotification('无法验证库存，请稍后重试', 'error');
+                            return;
+                        }
+                        
+                        if (stock < stockOutData.quantity) {
+                            showNotification('库存不足，无法完成出库操作', 'error');
+                            return;
+                        }
+                        
+                        // 提交出库操作
+                        submitStockOut(stockOutData)
+                            .then(() => {
+                                // 关闭模态框
+                                closeStockOut();
+                                
+                                // 重置表单
+                                $('#stock-out-form')[0].reset();
+                                $('#out-date').val(today);
+                                $('#out-stock').text('请选择商品查看库存');
+                                
+                                // 刷新相关数据
+                                loadStockStatistics();
+                                loadStockStatus();
+                                loadStockList();
+                                loadOutboundHistory();
+                            });
+                    });
+            });
+        });
+    </script>
+</body>
+</html>
+    
